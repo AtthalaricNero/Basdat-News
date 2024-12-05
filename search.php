@@ -1,36 +1,4 @@
-<!DOCTYPE html>
-
-<?php
-require 'db.php';
-
-$db = getDB();
-$posts = $db->posts->find(
-    [],
-    [
-        'sort' => ['created_at' => -1],
-    ]
-);
-
-$db = getDB();
-$categoryCollection = $db->categories;
-$categories = $categoryCollection->find();
-
-function generateSlug($title)
-{
-    return strtolower(preg_replace('/[^a-zA-Z0-9]+/', '-', trim($title)));
-}
-?>
-
-<html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
-    <title>BeritaKini</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
+<style>
         /* Style Global*/
         body {
             font-family: Arial, sans-serif;
@@ -258,68 +226,71 @@ function generateSlug($title)
             border-color: #007bff;
         }
     </style>
-</head>
+<?php
+require 'db.php';
 
+$db = getDB();
+$searchQuery = isset($_GET['q']) ? trim($_GET['q']) : '';
+
+$searchCriteria = [
+    '$or' => [
+        ['title' => new MongoDB\BSON\Regex($searchQuery, 'i')],
+        ['category' => new MongoDB\BSON\Regex($searchQuery, 'i')],
+        ['author' => new MongoDB\BSON\Regex($searchQuery, 'i')]
+    ]
+];
+
+$posts = $db->posts->find($searchCriteria, [
+    'sort' => ['created_at' => -1],
+]);
+
+$categories = $db->categories->find();
+
+function generateSlug($title)
+{
+    return strtolower(preg_replace('/[^a-zA-Z0-9]+/', '-', trim($title)));
+}
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Search Results - BeritaKini</title>
+    <style>
+        /* Add your styles here */
+    </style>
+</head>
 <body>
     <header>
         <div class="container">
-            <h1>BeritaKini</h1>
-            <nav>
-                <a href="#latest-news">Berita Terbaru</a>
-                <a href="#categories">Kategori</a>
-                <a href="#about">Tentang Kami</a>
-                <a href="login.php" class="login-button">Login</a>
-            </nav>
+            <h1>Hasil Pencarian untuk: <?= htmlspecialchars($searchQuery) ?></h1>
         </div>
     </header>
 
-    <section class="hero">
+    <section class="news">
         <div class="container">
-            <h2>Berita Terkini dan Terpercaya</h2>
-            <p>Dapatkan informasi terkini dari berbagai kategori, mulai dari politik, teknologi, olahraga, dan lainnya.</p>
-            <button onclick="scrollToSection('latest-news')">Lihat Berita Terbaru</button>
-        </div>
-    </section>
-
-    <section class="search">
-        <div class="container">
-            <input type="text" id="search-bar" placeholder="Cari berita...">
-            <button id="search-button">Cari</button>
-        </div>
-    </section>
-
-    <section id="categories" class="categories">
-        <div class="container">
-            <h2>Kategori Berita</h2>
-            <div class="category-list">
-                <div class="category-item" data-category="all">Semua</div>
-                <?php foreach ($categories as $category): ?>
-                    <div class="category-item" data-category="<?= htmlspecialchars($category['name']) ?>">
-                        <?= htmlspecialchars($category['name']) ?>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-        </div>
-    </section>
-
-
-    <section id="latest-news" class="news">
-        <div class="container">
-            <h2>Berita Terbaru</h2>
+            <h2>Berita Ditemukan</h2>
             <div class="news-list">
-                <?php foreach ($posts as $post): ?>
-                    <?php $slug = generateSlug($post['title']); ?>
-                    <div class="news-item" data-category="<?= htmlspecialchars($post['category']) ?>">
-                        <h3>
-                            <a id="title" href="berita/<?= $slug ?>">
-                                <?= htmlspecialchars($post['title']) ?>
-                            </a>
-                        </h3>
-                        <p id="summary"><?= nl2br(htmlspecialchars($post['summary'])) ?></p>
-                        <p id="date"><?= htmlspecialchars($post['created_at']->toDateTime()->format('F j, Y')) ?></p>
-                        <p><?= htmlspecialchars($post['category']) ?></p>
-                    </div>
-                <?php endforeach; ?>
+                <?php if ($posts->isDead()): ?>
+                    <p>Tidak ada berita yang ditemukan.</p>
+                <?php else: ?>
+                    <?php foreach ($posts as $post): ?>
+                        <?php $slug = generateSlug($post['title']); ?>
+                        <div class="news-item" data-category="<?= htmlspecialchars($post['category']) ?>">
+                            <h3>
+                                <a id="title" href="berita/<?= $slug ?>">
+                                    <?= htmlspecialchars($post['title']) ?>
+                                </a>
+                            </h3>
+                            <p id="summary"><?= nl2br(htmlspecialchars($post['summary'])) ?></p>
+                            <p id="date"><?= htmlspecialchars($post['created_at']->toDateTime()->format('F j, Y')) ?></p>
+                            <p><?= htmlspecialchars($post['category']) ?></p>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
             </div>
         </div>
     </section>
@@ -329,46 +300,5 @@ function generateSlug($title)
             <p>&copy; 2024 BeritaKini. Semua Hak Dilindungi.</p>
         </div>
     </footer>
-
-    <script>
-        function scrollToSection(id) {
-            document.getElementById(id).scrollIntoView({
-                behavior: "smooth"
-            });
-        }
-
-        document.getElementById("search-button").addEventListener("click", function() {
-            const query = document.getElementById("search-bar").value;
-            if (query) {
-                window.location.href = `search.php?q=${encodeURIComponent(query)}`;
-            }
-        });
-
-
-        document.addEventListener("DOMContentLoaded", () => {
-            const categoryItems = document.querySelectorAll(".category-item");
-            const newsItems = document.querySelectorAll(".news-item");
-
-            categoryItems.forEach((item) => {
-                item.addEventListener("click", () => {
-                    const selectedCategory = item.getAttribute("data-category");
-
-                    newsItems.forEach((news) => {
-                        const newsCategory = news.getAttribute("data-category");
-
-                        if (selectedCategory === "all" || newsCategory === selectedCategory) {
-                            news.style.display = "block";
-                        } else {
-                            news.style.display = "none";
-                        }
-                    });
-
-                    categoryItems.forEach((cat) => cat.classList.remove("active"));
-                    item.classList.add("active");
-                });
-            });
-        });
-    </script>
 </body>
-
 </html>
